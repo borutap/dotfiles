@@ -1,0 +1,2 @@
+# Map right CTRL to CAPS LOCK
+xmodmap -e "keycode 105 = Caps_Lock"
