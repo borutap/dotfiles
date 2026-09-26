@@ -4,27 +4,20 @@ Może być przydatne `sudo apt install xclip`
 Żeby przeładować - `tmux source-file ~/.tmux.conf`
 
 # Mapowanie CAPS LOCK na ESC
-Chyba najlepiej specjalnym programem ktory omija DE. 
 
-```
-sudo add-apt-repository ppa:deafmute/interception
-sudo apt update
+Chyba najlepiej specjalnym programem ktory omija DE (interception-tools + caps2esc).
+Od Ubuntu 24 oba są w oficjalnych repo — nie trzeba PPA ani budowania ze źródeł:
+
+```bash
 sudo apt install interception-tools interception-caps2esc
 ```
 
-If the PPA doesn't work for your Ubuntu, you can build from source:
+Uwaga: w paczce Debiana/Ubuntu `intercept` nazywa się `interception` (konflikt nazw),
+a binarki są w `/usr/bin`, nie w `/usr/local/bin`.
 
-```
-sudo apt install cmake libudev-dev libyaml-cpp-dev libevdev-dev && \
-git clone https://gitlab.com/interception/linux/tools.git /tmp/interception-tools && cd /tmp/interception-tools && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && sudo cmake --install build && \
-git clone https://gitlab.com/interception/linux/plugins/caps2esc.git /tmp/caps2esc && cd /tmp/caps2esc && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && sudo cmake --install build
-```
-  
-To zainstaluje program w bin (nie szkodzi ze zrodla sa w /tmp).
+Config i service:
 
-Teraz set up config i service:
-
-```
+```bash
 sudo mkdir -p /etc/interception/udevmon.d && \
 sudo tee /etc/systemd/system/udevmon.service << 'EOF'
 [Unit]
@@ -33,7 +26,7 @@ Wants=systemd-udev-settle.service
 After=systemd-udev-settle.service
 
 [Service]
-ExecStart=/usr/local/bin/udevmon -c /etc/interception/udevmon.d/caps2esc.yaml
+ExecStart=/usr/bin/udevmon -c /etc/interception/udevmon.d/caps2esc.yaml
 Restart=always
 
 [Install]
@@ -41,22 +34,31 @@ WantedBy=multi-user.target
 EOF
 ```
 
-Then:
-
-```
+```bash
 sudo tee /etc/interception/udevmon.d/caps2esc.yaml << 'EOF'
-- JOB: intercept -g $DEVNODE | caps2esc -m 1 | uinput -d $DEVNODE
-  DEVICE:
-    EVENTS:
-      EV_KEY: [KEY_CAPSLOCK, KEY_ESC]
+- JOB: interception -g $DEVNODE | caps2esc -m 1 | uinput -d $DEVNODE
+DEVICE:
+  EVENTS:
+    EV_KEY: [KEY_CAPSLOCK, KEY_ESC]
 EOF
 ```
 
-Start the service:
+Start:
 
-```
+```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now udevmon
+```
+
+Debug: `journalctl -u udevmon -b --no-pager | tail`
+
+### Migracja z Ubuntu 22 (stara wersja budowana ze źródeł)
+
+Stare binarki w `/usr/local/bin` są zlinkowane z `libyaml-cpp.so.0.7`, której nie ma w Ubuntu 24.
+Trzeba je usunąć (inaczej mają pierwszeństwo w PATH przed `/usr/bin`):
+
+```bash
+sudo rm /usr/local/bin/{udevmon,intercept,uinput,mux,caps2esc}
 ```
 
 # inputrc
